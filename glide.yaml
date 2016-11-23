@@ -1,0 +1,10 @@
+package: github.com/euforia/chordstore
+import:
+- package: github.com/euforia/go-chord
+- package: github.com/golang/protobuf
+  subpackages:
+  - proto
+- package: golang.org/x/net
+  subpackages:
+  - context
+- package: google.golang.org/grpc

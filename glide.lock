@@ -1,0 +1,30 @@
+hash: cbabc7f9897b8ea67863924e14c6b9eef32025186116c0e9808916736b8547a7
+updated: 2016-11-22T22:19:16.273971674-08:00
+imports:
+- name: github.com/euforia/go-chord
+  version: 4fa7f4812317e73bbd8622abcb2c039234c86ebe
+- name: github.com/golang/protobuf
+  version: df1d3ca07d2d07bba352d5b73c4313b4e2a6203e
+  subpackages:
+  - proto
+- name: golang.org/x/net
+  version: cd8c2701a5e10f044db915e65eac68f738399d22
+  subpackages:
+  - context
+  - http2
+  - http2/hpack
+  - internal/timeseries
+  - trace
+- name: google.golang.org/grpc
+  version: eddbd11c7ecd001d06777cb87b5ea7af54227907
+  subpackages:
+  - codes
+  - credentials
+  - grpclog
+  - internal
+  - metadata
+  - naming
+  - peer
+  - tap
+  - transport
+testImports: []

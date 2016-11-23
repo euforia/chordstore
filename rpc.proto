@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package chordstore;
+
+import "github.com/euforia/go-chord/net.proto";
+
+service DHT {
+    rpc PutKeyRPC(DHTKeyValue) returns(ErrResponse) {}
+    rpc GetKeyRPC(DHTBytes) returns(DHTBytesErr) {}
+    rpc UpdateKeyRPC(DHTHashKeyValue) returns(ErrResponse) {}
+    rpc RemoveKeyRPC(DHTBytes) returns(ErrResponse) {}
+    rpc SnapshotRPC(chord.Vnode) returns(stream DataStream) {}
+    rpc RestoreRPC(stream DataStream) returns(ErrResponse) {}
+}
+
+message DHTKeyValue {
+    chord.Vnode vn = 1;
+    bytes key = 2;
+    bytes value = 3;
+}
+
+message DHTHashKeyValue {
+    chord.Vnode vn = 1;
+    bytes prevHash = 2;
+    bytes key = 3;
+    bytes value = 4;
+
+}
+
+message DHTBytes {
+    chord.Vnode vn = 1;
+    bytes b = 2;
+}
+
+message DHTBytesErr {
+    bytes b = 1;
+    string err = 2;
+}
+
+message ErrResponse {
+    string err = 1;
+}
+
+message SnapshotOptions {
+    chord.Vnode vn = 1;
+}
+
+message DataStream {
+    bytes data = 1;
+}
