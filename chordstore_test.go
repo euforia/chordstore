@@ -29,8 +29,8 @@ func initConfig(p int, j ...string) (*Config, error) {
 
 	c1 := DefaultConfig(laddr)
 
-	c1.Chord.StabilizeMin = time.Second
-	c1.Chord.StabilizeMax = 5 * time.Second
+	c1.Chord.StabilizeMin = 15 * time.Millisecond
+	c1.Chord.StabilizeMax = 45 * time.Millisecond
 	c1.Chord.Peers = j
 
 	var err error
@@ -73,6 +73,13 @@ func Test_ChordStore(t *testing.T) {
 	if len(rsp) != testReplicas {
 		t.Fatal("mismatch")
 	}
+	for _, r := range rsp {
+		if r.Err != nil {
+			t.Fatal(r.Err)
+		}
+
+	}
+
 	t.Logf("PUT %+v", *rsp[0])
 
 	// Get
@@ -140,6 +147,75 @@ func Test_ChordStore(t *testing.T) {
 
 	cs1.Shutdown()
 	cs2.Shutdown()
+}
+
+func Test_ChordStore_Snapshot_Restore(t *testing.T) {
+	c1, err := initConfig(12345)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cs1, e1 := NewChordStore(c1, &MemKeyValueStore{})
+	if e1 != nil {
+		t.Fatal(e1)
+	}
+
+	<-time.After(200 * time.Millisecond)
+	c2, err := initConfig(65432, "127.0.0.1:12345")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cs2, e2 := NewChordStore(c2, &MemKeyValueStore{})
+	if e2 != nil {
+		t.Fatal(e2)
+	}
+
+	<-time.After(200 * time.Millisecond)
+	prsp, err := cs1.PutKey(3, []byte("key"), []byte("value"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range prsp {
+		if r.Err != nil {
+			t.Fatal(r.Err)
+		}
+	}
+
+	gr, _ := cs2.GetKey(3, []byte("key"))
+	for _, r := range gr {
+		if r.Err != nil {
+			t.Fatal(r.Err)
+		}
+		if string(r.Data) != "value" {
+			t.Fatal("value mismatch")
+		}
+	}
+
+	<-time.After(300 * time.Millisecond)
+	c1.Ring.Leave()
+	cs1.Shutdown()
+
+	c1.Listener.Close()
+	c1.Chord.Transport.Shutdown()
+
+	// Wait for stabilize
+	<-time.After(500 * time.Millisecond)
+	rsp, err := cs2.GetKey(3, []byte("key"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, r := range rsp {
+		if r.Err != nil {
+			t.Fatal(r.Err)
+		}
+	}
+
+	if len(rsp) != 3 {
+		t.Fatalf("length mismatch have=%d want=3", len(rsp))
+	}
+
 }
 
 func Test_VnodeData_Marshal(t *testing.T) {
