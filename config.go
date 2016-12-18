@@ -38,7 +38,7 @@ type Config struct {
 	// Key replication count.
 	Replicas int
 	// Actual chord ring
-	Ring *chord.Ring
+	Ring *chord.Ring `json:"-"`
 }
 
 // ChordDelegate returns a type delegate
@@ -68,10 +68,10 @@ func DefaultConfig(bindAddr string) *Config {
 	return c
 }
 
-// InitChord initializes the ring
+// initChordRing initializes the ring with the given config and assigns the
+// initialized ring back to the config.
 func initChordRing(cfg *Config) (err error) {
-	cfg.Chord.Transport = chord.NewGRPCTransport(
-		cfg.Listener, cfg.Server, cfg.Chord.Timeout, cfg.Chord.ConnMaxIdle)
+	cfg.Chord.Transport = chord.NewGRPCTransport(cfg.Listener, cfg.Server, cfg.Chord.Timeout, cfg.Chord.ConnMaxIdle)
 
 	if len(cfg.Chord.Peers) == 0 {
 		log.Println("[chord] Creating ring...")
@@ -88,9 +88,10 @@ func initChordRing(cfg *Config) (err error) {
 		ring, e := chord.Join(cfg.Chord.Config, cfg.Chord.Transport, peer)
 		if e == nil {
 			cfg.Ring = ring
+			log.Printf("[chord] Joined peer: %s", peer)
 			return
 		}
-		log.Printf("[chord] Peer contact failed %s: %s", peer, err)
+		log.Printf("[chord] Failed to contact peer %s: %v", peer, err)
 	}
 	return fmt.Errorf("exhausted all peers")
 }

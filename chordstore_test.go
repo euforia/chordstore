@@ -1,7 +1,6 @@
 package chordstore
 
 import (
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -38,6 +37,16 @@ func initConfig(p int, j ...string) (*Config, error) {
 	return c1, err
 }
 
+func Test_ChordDelegate(t *testing.T) {
+	c1, _ := initConfig(0)
+	defer c1.Listener.Close()
+
+	cd := c1.ChordDelegate()
+	if cd == nil {
+		t.Fatal("delegate not set")
+	}
+}
+
 func Test_ChordStore(t *testing.T) {
 	c1, err := initConfig(44332)
 	if err != nil {
@@ -47,12 +56,6 @@ func Test_ChordStore(t *testing.T) {
 	cs1, e1 := NewChordStore(c1, &MemKeyValueStore{})
 	if e1 != nil {
 		t.Fatal(e1)
-	}
-
-	cd := c1.ChordDelegate()
-	if cd == nil {
-		t.Log("delegate not set")
-		t.Fail()
 	}
 
 	<-time.After(200 * time.Millisecond)
@@ -96,8 +99,8 @@ func Test_ChordStore(t *testing.T) {
 	t.Logf("GET %+v", rsp2)
 
 	// Update
-	prevHash := sha256.Sum256([]byte("value"))
-	_, e21 := cs2.UpdateKey(testReplicas, prevHash[:], testKey, []byte("newValue"))
+	//prevHash := sha256.Sum256([]byte("value"))
+	_, e21 := cs2.UpdateKey(testReplicas, testKey, []byte("newValue"))
 	if e21 != nil {
 		t.Fatal(e21)
 	}
@@ -115,13 +118,28 @@ func Test_ChordStore(t *testing.T) {
 		t.Fatal("update value mismatch")
 	}
 
-	rf, e := cs1.UpdateKey(1, prevHash[:], testKey, []byte("newValue"))
+	rf, e := cs1.UpdateKey(testReplicas, testKey, []byte("newValue2"))
 	if e != nil {
 		t.Log("request failed")
 		t.Fail()
 	}
-	if rf[0].Err == nil {
-		t.Fatal("should fail with invalid hash")
+	for _, v := range rf {
+		if v.Err != nil {
+			t.Fatal(err)
+		}
+	}
+	gf, ef := cs2.GetKey(testReplicas, testKey)
+	if ef != nil {
+		t.Log("request failed")
+		t.Fail()
+	}
+	for _, v := range gf {
+		if v.Err != nil {
+			t.Fatal(err)
+		} else if string(v.Data) != "newValue2" {
+			t.Fatal("value mismatch")
+		}
+
 	}
 
 	//<-time.After(100 * time.Millisecond)

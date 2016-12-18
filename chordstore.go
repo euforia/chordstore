@@ -2,7 +2,9 @@ package chordstore
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"io"
 
 	chord "github.com/euforia/go-chord"
@@ -19,11 +21,16 @@ type Store interface {
 
 	Snapshot(vn *chord.Vnode, wr io.Writer) error
 	Restore(vn *chord.Vnode, rd io.Reader) error
+
+	GetObject(vn *chord.Vnode, key []byte) (io.Reader, error)
+	PutObject(vn *chord.Vnode, key []byte, rd io.Reader) error
+	RemoveObject(vn *chord.Vnode, key []byte) error
 }
 
-// VnodeStore are operations for local vnodes
+// VnodeStore are operations for local vnodes. It also instantiates new stores
 type VnodeStore interface {
-	New() (VnodeStore, error)
+	New() (VnodeStore, error) // Instantiate a new store
+
 	GetKey(key []byte) ([]byte, error)
 	PutKey(key, value []byte) error
 	UpdateKey(prevHash, key, value []byte) error
@@ -31,6 +38,10 @@ type VnodeStore interface {
 
 	Snapshot(io.Writer) error
 	Restore(io.Reader) error
+
+	GetObject(key []byte) (io.Reader, error)
+	PutObject(key []byte, rd io.Reader) error
+	RemoveObject(key []byte) error
 }
 
 // ChordStore implements chord ring base storage
@@ -62,6 +73,56 @@ func NewChordStore(cfg *Config, vnstore VnodeStore) (*ChordStore, error) {
 	return cs, nil
 }
 
+func (cs *ChordStore) GetObject(n int, key []byte) (io.Reader, error) {
+	vns, err := cs.ring.Lookup(n, key)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, vn := range vns {
+		rd, e := cs.store.GetObject(vn, key)
+		if e == nil {
+			return rd, nil
+		}
+		err = e
+	}
+	return nil, err
+}
+
+// PutObject from reader returning the sha256 hash as the key
+func (cs *ChordStore) PutObject(n int, key []byte, rd io.Reader) error {
+	buf := new(bytes.Buffer)
+	_, err := io.Copy(buf, rd)
+	if err != nil {
+		return err
+	}
+
+	vns, err := cs.ring.Lookup(n, key)
+	if err != nil {
+		return err
+	}
+
+	for _, vn := range vns {
+		err = mergeErrors(err, cs.store.PutObject(vn, key, buf))
+		buf.Reset()
+	}
+
+	return err
+}
+
+func (cs *ChordStore) RemoveObject(n int, key []byte) error {
+	vns, err := cs.ring.Lookup(n, key)
+	if err != nil {
+		return err
+	}
+
+	for _, vn := range vns {
+		err = mergeErrors(err, cs.store.RemoveObject(vn, key))
+	}
+
+	return err
+}
+
 // PutKey with value on the ring with a replica count of n
 func (cs *ChordStore) PutKey(n int, key, value []byte) ([]*VnodeData, error) {
 	vns, err := cs.ring.Lookup(n, key)
@@ -78,18 +139,31 @@ func (cs *ChordStore) PutKey(n int, key, value []byte) ([]*VnodeData, error) {
 }
 
 // UpdateKey with value on the ring with a replica count of n
-func (cs *ChordStore) UpdateKey(n int, prevHash, key, value []byte) ([]*VnodeData, error) {
-	vns, err := cs.ring.Lookup(n, key)
-	if err == nil {
-		out := make([]*VnodeData, len(vns))
-		for i, vn := range vns {
-			o := &VnodeData{Vnode: vn}
-			o.Err = cs.store.UpdateKey(vn, prevHash, key, value)
-			out[i] = o
-		}
-		return out, nil
+func (cs *ChordStore) UpdateKey(n int, key, value []byte) ([]*VnodeData, error) {
+	// Get current
+	rsp, err := cs.GetKey(n, key)
+	if err != nil {
+		return nil, err
 	}
-	return nil, err
+	// Check all copies for same hash to use as previousHash
+	hash := rsp[0].Hash()
+	for i := 1; i < len(rsp); i++ {
+		h := rsp[i].Hash()
+		if !bytes.Equal(hash[:], h[:]) {
+			// TODO:
+			//cs.healQ <- HealRequest{Vnode: rsp[i].Vnode, Key: key}
+			return nil, fmt.Errorf("inconsistent key %x %x", hash, h)
+		}
+	}
+
+	// Update each vnode from GetKey
+	out := make([]*VnodeData, len(rsp))
+	for i, r := range rsp {
+		o := &VnodeData{Vnode: r.Vnode}
+		o.Err = cs.store.UpdateKey(r.Vnode, hash[:], key, value)
+		out[i] = o
+	}
+	return out, nil
 }
 
 // GetKey with n replicas
@@ -225,6 +299,85 @@ func (cs *ChordStore) RestoreRPC(stream DHT_RestoreRPCServer) error {
 	return stream.SendAndClose(ersp)
 }
 
+func (cs *ChordStore) PutObjectRPC(stream DHT_PutObjectRPCServer) error {
+	ctx := stream.Context()
+	vn, ok := ctx.Value("vnode").(*chord.Vnode)
+	if !ok {
+		return stream.SendAndClose(&ErrResponse{Err: "vnode not provided"})
+	}
+	oid, ok := ctx.Value("oid").([]byte)
+	if !ok {
+		return stream.SendAndClose(&ErrResponse{Err: "oid not provided"})
+	}
+
+	buf := new(bytes.Buffer)
+
+	for {
+		dc, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return stream.SendAndClose(&ErrResponse{Err: err.Error()})
+		}
+
+		buf.Write(dc.Data)
+	}
+
+	rsp := &ErrResponse{}
+	if err := cs.store.PutObject(vn, oid, buf); err != nil {
+		rsp.Err = err.Error()
+	}
+
+	return stream.SendAndClose(rsp)
+}
+
+// GetObjectRPC is the server side call
+func (cs *ChordStore) GetObjectRPC(key *DHTBytes, stream DHT_GetObjectRPCServer) error {
+	var (
+		vn     = key.Vn
+		objkey = key.B
+	)
+
+	rd, err := cs.store.GetObject(vn, objkey)
+	if err != nil {
+		return err
+	}
+
+	out := make([]byte, 65519)
+	for {
+		n, err := rd.Read(out)
+		if err != nil {
+			if err != io.EOF {
+				//log.Println("ERR", err, shortID(vn))
+				return err
+			}
+			break
+		}
+
+		ds := &DataStream{Data: out[:n]}
+		if err = stream.Send(ds); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (cs *ChordStore) RemoveObjectRPC(ctx context.Context, key *DHTBytes) (*ErrResponse, error) {
+	var (
+		vn     = key.Vn
+		objkey = key.B
+	)
+
+	rsp := &ErrResponse{}
+	if err := cs.store.RemoveObject(vn, objkey); err != nil {
+		rsp.Err = err.Error()
+	}
+
+	return rsp, nil
+}
+
 // Shutdown underlying stores.  This does not shutdown any underlying services.
 func (cs *ChordStore) Shutdown() error {
 	return cs.store.Shutdown()
@@ -235,6 +388,12 @@ type VnodeData struct {
 	Vnode *chord.Vnode
 	Data  []byte
 	Err   error
+}
+
+// Hash returns the sha256 hash of the data
+func (vd *VnodeData) Hash() []byte {
+	s := sha256.Sum256(vd.Data)
+	return s[:]
 }
 
 // MarshalJSON custom

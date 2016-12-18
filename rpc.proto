@@ -9,6 +9,11 @@ service DHT {
     rpc GetKeyRPC(DHTBytes) returns(DHTBytesErr) {}
     rpc UpdateKeyRPC(DHTHashKeyValue) returns(ErrResponse) {}
     rpc RemoveKeyRPC(DHTBytes) returns(ErrResponse) {}
+
+    rpc PutObjectRPC(stream DataStream) returns(ErrResponse) {}
+    rpc GetObjectRPC(DHTBytes) returns(stream DataStream) {}
+    rpc RemoveObjectRPC(DHTBytes) returns(ErrResponse) {}
+
     rpc SnapshotRPC(chord.Vnode) returns(stream DataStream) {}
     rpc RestoreRPC(stream DataStream) returns(ErrResponse) {}
 }

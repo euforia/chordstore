@@ -1,6 +1,7 @@
 package chordstore
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"sync"
@@ -118,6 +119,78 @@ func (st *ChordStoreTransport) GetKey(vn *chord.Vnode, key []byte) ([]byte, erro
 	return nil, err
 }
 
+func (st *ChordStoreTransport) GetObject(vn *chord.Vnode, key []byte) (io.Reader, error) {
+	out, err := st.getClient(vn.Host)
+	if err != nil {
+		return nil, err
+	}
+	defer st.returnClient(out)
+
+	cli, err := out.c.GetObjectRPC(context.Background(), &DHTBytes{B: key, Vn: vn})
+	if err != nil {
+		return nil, err
+	}
+
+	buf := new(bytes.Buffer)
+	for {
+		ds, e := cli.Recv()
+		if e != nil {
+			if e != io.EOF {
+				err = e
+			}
+			break
+		}
+		buf.Write(ds.Data)
+	}
+
+	return buf, err
+}
+
+func (st *ChordStoreTransport) PutObject(vn *chord.Vnode, key []byte, rd io.Reader) error {
+	out, err := st.getClient(vn.Host)
+	if err != nil {
+		return err
+	}
+	defer st.returnClient(out)
+
+	ctx := context.WithValue(context.Background(), "oid", key)
+	ctx = context.WithValue(ctx, "vnode", vn)
+	cli, err := out.c.PutObjectRPC(ctx)
+	if err != nil {
+		return err
+	}
+
+	buf := make([]byte, 65519)
+	for {
+		n, err := rd.Read(buf)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+		}
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+
+		ds := &DataStream{Data: buf[:n]}
+		if err = cli.Send(ds); err != nil {
+			return err
+		}
+	}
+
+	ersp, err := cli.CloseAndRecv()
+	if err != nil {
+		return err
+	}
+
+	if len(ersp.Err) > 0 {
+		return fmt.Errorf(ersp.Err)
+	}
+	return nil
+}
+
 // PutKey writes a key value to the vnode
 func (st *ChordStoreTransport) PutKey(vn *chord.Vnode, key, value []byte) error {
 	out, err := st.getClient(vn.Host)
@@ -162,6 +235,22 @@ func (st *ChordStoreTransport) RemoveKey(vn *chord.Vnode, key []byte) error {
 		defer st.returnClient(out)
 		var resp *ErrResponse
 		if resp, err = out.c.RemoveKeyRPC(context.Background(), &DHTBytes{B: key, Vn: vn}); err == nil {
+			if resp.Err == "" {
+				return nil
+			}
+			err = fmt.Errorf(resp.Err)
+		}
+	}
+	return err
+}
+
+// RemoveObject from a vnode
+func (st *ChordStoreTransport) RemoveObject(vn *chord.Vnode, key []byte) error {
+	out, err := st.getClient(vn.Host)
+	if err == nil {
+		defer st.returnClient(out)
+		var resp *ErrResponse
+		if resp, err = out.c.RemoveObjectRPC(context.Background(), &DHTBytes{B: key, Vn: vn}); err == nil {
 			if resp.Err == "" {
 				return nil
 			}
@@ -224,14 +313,4 @@ func (st *ChordStoreTransport) returnClient(c *rpcOutClient) {
 	}
 	list, _ := st.pool[c.host]
 	st.pool[c.host] = append(list, c)
-}
-
-func mergeErrors(err1, err2 error) error {
-	if err1 == nil {
-		return err2
-	} else if err2 == nil {
-		return err1
-	} else {
-		return fmt.Errorf("%s\n%s", err1, err2)
-	}
 }

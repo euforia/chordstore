@@ -88,6 +88,30 @@ func (ts *TransparentStore) Restore(vn *chord.Vnode, rd io.Reader) error {
 	return ts.remote.Restore(vn, rd)
 }
 
+// GetObject from the given vnode
+func (ts *TransparentStore) GetObject(vn *chord.Vnode, key []byte) (io.Reader, error) {
+	if st, ok := ts.local[vn.StringID()]; ok {
+		return st.GetObject(key)
+	}
+	return ts.remote.GetObject(vn, key)
+}
+
+// PutObject data from the reader to the vnode
+func (ts *TransparentStore) PutObject(vn *chord.Vnode, key []byte, rd io.Reader) error {
+	if st, ok := ts.local[vn.StringID()]; ok {
+		return st.PutObject(key, rd)
+	}
+	return ts.remote.PutObject(vn, key, rd)
+}
+
+// RemoveObject from vnode with the given key
+func (ts *TransparentStore) RemoveObject(vn *chord.Vnode, key []byte) error {
+	if st, ok := ts.local[vn.StringID()]; ok {
+		return st.RemoveObject(key)
+	}
+	return ts.remote.RemoveObject(vn, key)
+}
+
 // Shutdown remote and local stores
 func (ts *TransparentStore) Shutdown() error {
 	return ts.remote.Shutdown()
@@ -96,17 +120,53 @@ func (ts *TransparentStore) Shutdown() error {
 // MemKeyValueStore is an in memory key-value store
 type MemKeyValueStore struct {
 	mu sync.Mutex
-	m  map[string][]byte
+	// key-value
+	m map[string][]byte
+	// objects
+	o map[string][]byte
 }
 
 func (s *MemKeyValueStore) New() (VnodeStore, error) {
-	return &MemKeyValueStore{m: map[string][]byte{}}, nil
+	return &MemKeyValueStore{m: map[string][]byte{}, o: map[string][]byte{}}, nil
 }
 
-// NewMemKeyValueStore instantiates new in memory key value store
-/*func NewMemKeyValueStore() *MemKeyValueStore {
-	return &MemKeyValueStore{m: map[string][]byte{}}
-}*/
+func (s *MemKeyValueStore) GetObject(key []byte) (io.Reader, error) {
+	v, ok := s.o[fmt.Sprintf("%x", key)]
+	if !ok {
+		return nil, fmt.Errorf("key not found: %x", key)
+	}
+
+	buf := new(bytes.Buffer)
+	_, err := buf.Write(v)
+	return buf, err
+}
+
+func (s *MemKeyValueStore) PutObject(key []byte, rd io.Reader) error {
+	buf := new(bytes.Buffer)
+	_, err := io.Copy(buf, rd)
+	if err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.o[fmt.Sprintf("%x", key)] = buf.Bytes()
+	return nil
+}
+
+func (s *MemKeyValueStore) RemoveObject(key []byte) error {
+	k := fmt.Sprintf("%x", key)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.o[k]; ok {
+		delete(s.o, k)
+		return nil
+	}
+	return fmt.Errorf("key not found: %x", key)
+}
 
 // GetKey from datastore
 func (s *MemKeyValueStore) GetKey(key []byte) ([]byte, error) {
@@ -146,7 +206,7 @@ func (s *MemKeyValueStore) UpdateKey(prevHash, key, value []byte) error {
 		return nil
 	}
 
-	return fmt.Errorf("invalid previous hash")
+	return fmt.Errorf("invalid previous hash: %x != %x", pv, prevHash)
 }
 
 // RemoveKey a key from the datastore
