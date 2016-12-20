@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 
 	chord "github.com/euforia/go-chord"
 	context "golang.org/x/net/context"
@@ -79,11 +80,13 @@ func (cs *ChordStore) GetObject(n int, key []byte) (io.Reader, error) {
 		return nil, err
 	}
 
-	for _, vn := range vns {
+	for i, vn := range vns {
+		log.Printf("%d GET %s %x", i, shortID(vn), key)
 		rd, e := cs.store.GetObject(vn, key)
 		if e == nil {
 			return rd, nil
 		}
+		log.Printf("%d GET ERR %s %x %v", i, shortID(vn), key, e)
 		err = e
 	}
 	return nil, err
@@ -103,8 +106,8 @@ func (cs *ChordStore) PutObject(n int, key []byte, rd io.Reader) error {
 	}
 
 	for _, vn := range vns {
-		err = mergeErrors(err, cs.store.PutObject(vn, key, buf))
-		buf.Reset()
+		e := cs.store.PutObject(vn, key, bytes.NewBuffer(buf.Bytes()))
+		err = mergeErrors(err, e)
 	}
 
 	return err
@@ -270,11 +273,9 @@ func (cs *ChordStore) SnapshotRPC(vn *chord.Vnode, stream DHT_SnapshotRPCServer)
 
 // RestoreRPC server-side call
 func (cs *ChordStore) RestoreRPC(stream DHT_RestoreRPCServer) error {
-
-	ctx := stream.Context()
-	vn, ok := ctx.Value("vnode").(*chord.Vnode)
-	if !ok {
-		return stream.SendAndClose(&ErrResponse{Err: "vnode not provided"})
+	var vn chord.Vnode
+	if err := stream.RecvMsg(&vn); err != nil {
+		return err
 	}
 
 	buf := new(bytes.Buffer)
@@ -291,8 +292,15 @@ func (cs *ChordStore) RestoreRPC(stream DHT_RestoreRPCServer) error {
 		buf.Write(dc.Data)
 	}
 
+	/*ctx := stream.Context()
+	vn, ok := ctx.Value("vnode").(*chord.Vnode)
+	if !ok {
+		log.Println(ctx.Value("vnode"))
+		return stream.SendAndClose(&ErrResponse{Err: "vnode not provided"})
+	}*/
+
 	ersp := &ErrResponse{}
-	if err := cs.store.Restore(vn, buf); err != nil {
+	if err := cs.store.Restore(&vn, buf); err != nil {
 		ersp.Err = err.Error()
 	}
 

@@ -19,22 +19,24 @@ func (cd *ChordDelegate) NewPredecessor(local, remoteNew, remotePrev *chord.Vnod
 	log.Printf("[chord] NewPredecessor local=%s remote=%s old=%s", shortID(local), shortID(remoteNew), shortID(remotePrev))
 
 	buf := new(bytes.Buffer)
-	err := cd.Store.Snapshot(remoteNew, buf)
+	err := cd.Store.Snapshot(local, buf)
 
 	if err != nil {
 		if err != io.EOF {
-			log.Println("ERR", err, shortID(remoteNew))
+			log.Println("ERR", err, shortID(local))
+			return
 		}
-		return
 	}
+
 	// Skip if no data
 	if buf.Len() < 1 {
+		log.Println("Nothing to transfer.  No data!")
 		return
 	}
 
-	log.Printf("[chord] NewPredecessor: Copy %s -- keys --> %s", shortID(remoteNew), shortID(local))
+	log.Printf("[chord] NewPredecessor: Copy %s ----> %s", shortID(local), shortID(remoteNew))
 
-	if err = cd.Store.Restore(local, buf); err != nil {
+	if err = cd.Store.Restore(remoteNew, buf); err != nil {
 		log.Println("ERR", err)
 	}
 

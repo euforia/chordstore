@@ -218,7 +218,7 @@ func Test_ChordStore_Snapshot_Restore(t *testing.T) {
 	c1.Chord.Transport.Shutdown()
 
 	// Wait for stabilize
-	<-time.After(500 * time.Millisecond)
+	<-time.After(1000 * time.Millisecond)
 	rsp, err := cs2.GetKey(3, []byte("key"))
 	if err != nil {
 		t.Fatal(err)

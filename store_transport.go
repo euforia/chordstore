@@ -46,7 +46,6 @@ func (st *ChordStoreTransport) Snapshot(vn *chord.Vnode, wr io.Writer) error {
 
 		ds, e := cli.Recv()
 		if e != nil {
-			//log.Println("ERR", e, shortID(vn))
 			if e != io.EOF {
 				err = e
 			}
@@ -67,9 +66,12 @@ func (st *ChordStoreTransport) Restore(vn *chord.Vnode, rd io.Reader) error {
 	}
 	defer st.returnClient(out)
 
-	ctx := context.WithValue(context.Background(), "vnode", vn)
+	ctx := context.Background()
 	cli, err := out.c.RestoreRPC(ctx)
 	if err != nil {
+		return err
+	}
+	if err = cli.SendMsg(vn); err != nil {
 		return err
 	}
 

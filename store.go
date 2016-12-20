@@ -1,7 +1,6 @@
 package chordstore
 
 import (
-	"bufio"
 	"bytes"
 	"compress/zlib"
 	"crypto/sha256"
@@ -11,6 +10,7 @@ import (
 	"sync"
 
 	chord "github.com/euforia/go-chord"
+	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
 // TransparentStore abstracts remote and local datastores
@@ -220,7 +220,7 @@ func (s *MemKeyValueStore) RemoveKey(key []byte) error {
 
 // Snapshot the dataset serializing and compressing it to the writer.
 func (s *MemKeyValueStore) Snapshot(wr io.Writer) error {
-	if len(s.m) == 0 {
+	if len(s.m) == 0 && len(s.o) == 0 {
 		return io.EOF
 	}
 
@@ -230,14 +230,14 @@ func (s *MemKeyValueStore) Snapshot(wr io.Writer) error {
 	zw := zlib.NewWriter(wr)
 	defer zw.Close()
 
-	for k, v := range s.m {
-		l := append(append([]byte(k), '\x00'), v...)
-		l = append(l, '\n')
-		zw.Write(l)
-		zw.Flush()
+	log.Printf("[Snapshot] keys=%d objects=%d", len(s.m), len(s.o))
+
+	for k, v := range s.o {
+		log.Printf("%s %d", k, len(v))
 	}
 
-	return nil
+	menc := msgpack.NewEncoder(zw)
+	return menc.Encode(s.m, s.o)
 }
 
 // Restore dataset from reader de-compressing and de-serializing the data to the
@@ -250,34 +250,24 @@ func (s *MemKeyValueStore) Restore(r io.Reader) error {
 	}
 	defer rd.Close()
 
-	buf := bufio.NewReader(rd)
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	cnt := 0
-	for {
-		k, err := buf.ReadBytes('\x00')
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return err
-		}
-		k = k[:len(k)-1]
 
-		v, err := buf.ReadBytes('\n')
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return err
-		}
+	var tk, to map[string][]byte
+	dec := msgpack.NewDecoder(rd)
 
-		s.m[string(k)] = v[:len(v)-1]
-		cnt++
+	if err = dec.Decode(&tk, &to); err != nil {
+		return err
 	}
 
-	log.Println("Accept keys:", cnt)
+	log.Printf("[Restore] Received keys=%d objects=%d", len(tk), len(to))
+
+	for k, v := range tk {
+		s.m[k] = v
+	}
+	for k, v := range to {
+		s.o[k] = v
+	}
 
 	return nil
 }
