@@ -3,11 +3,18 @@ package chordstore
 import (
 	"bytes"
 	"testing"
+
+	chord "github.com/euforia/go-chord"
+)
+
+var (
+	testVn1 = &chord.Vnode{Id: []byte("foobarbaz1"), Host: "127.0.0.1:9876"}
+	testVn2 = &chord.Vnode{Id: []byte("foobarbaz2"), Host: "127.0.0.1:9877"}
 )
 
 func Test_MemKeyValueStore(t *testing.T) {
 	st := &MemKeyValueStore{}
-	kvs, _ := st.New()
+	kvs, _ := st.New(testVn1)
 	kvs1 := kvs.(*MemKeyValueStore)
 	kvs1.m = testKeyValue
 
@@ -18,7 +25,7 @@ func Test_MemKeyValueStore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	kvs, _ = st.New()
+	kvs, _ = st.New(testVn2)
 	kvs2 := kvs.(*MemKeyValueStore)
 
 	if err := kvs2.Restore(buf); err != nil {

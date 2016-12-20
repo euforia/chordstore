@@ -14,30 +14,32 @@ type ChordDelegate struct {
 	Store Store
 }
 
-// NewPredecessor is called when a new predecessor is found
-func (cd *ChordDelegate) NewPredecessor(local, remoteNew, remotePrev *chord.Vnode) {
-	log.Printf("[chord] NewPredecessor local=%s remote=%s old=%s", shortID(local), shortID(remoteNew), shortID(remotePrev))
-
+func (cd *ChordDelegate) transferVnodeData(src, dst *chord.Vnode) error {
 	buf := new(bytes.Buffer)
-	err := cd.Store.Snapshot(local, buf)
+	err := cd.Store.Snapshot(src, buf)
 
 	if err != nil {
 		if err != io.EOF {
-			log.Println("ERR", err, shortID(local))
-			return
+			return err
 		}
 	}
 
 	// Skip if no data
 	if buf.Len() < 1 {
 		log.Println("Nothing to transfer.  No data!")
-		return
+		return nil
 	}
 
-	log.Printf("[chord] NewPredecessor: Copy %s ----> %s", shortID(local), shortID(remoteNew))
+	log.Printf("[transfer] Copying %s --> %s", shortID(src), shortID(dst))
+	return cd.Store.Restore(dst, buf)
+}
 
-	if err = cd.Store.Restore(remoteNew, buf); err != nil {
-		log.Println("ERR", err)
+// NewPredecessor is called when a new predecessor is found
+func (cd *ChordDelegate) NewPredecessor(local, remoteNew, remotePrev *chord.Vnode) {
+	log.Printf("[chord] NewPredecessor local=%s remote=%s old=%s", shortID(local), shortID(remoteNew), shortID(remotePrev))
+	// Ship a copy of the local vnode to the remote
+	if err := cd.transferVnodeData(local, remoteNew); err != nil {
+		log.Println("ERR [transfer]", local, remoteNew, err)
 	}
 
 }

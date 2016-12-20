@@ -30,7 +30,7 @@ type Store interface {
 
 // VnodeStore are operations for local vnodes. It also instantiates new stores
 type VnodeStore interface {
-	New() (VnodeStore, error) // Instantiate a new store
+	New(*chord.Vnode) (VnodeStore, error) // Instantiate a new store
 
 	GetKey(key []byte) ([]byte, error)
 	PutKey(key, value []byte) error

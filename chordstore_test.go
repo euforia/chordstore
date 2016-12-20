@@ -168,7 +168,7 @@ func Test_ChordStore(t *testing.T) {
 }
 
 func Test_ChordStore_Snapshot_Restore(t *testing.T) {
-	c1, err := initConfig(12345)
+	c1, err := initConfig(22345)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,17 +176,6 @@ func Test_ChordStore_Snapshot_Restore(t *testing.T) {
 	cs1, e1 := NewChordStore(c1, &MemKeyValueStore{})
 	if e1 != nil {
 		t.Fatal(e1)
-	}
-
-	<-time.After(200 * time.Millisecond)
-	c2, err := initConfig(65432, "127.0.0.1:22345")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cs2, e2 := NewChordStore(c2, &MemKeyValueStore{})
-	if e2 != nil {
-		t.Fatal(e2)
 	}
 
 	<-time.After(200 * time.Millisecond)
@@ -200,7 +189,7 @@ func Test_ChordStore_Snapshot_Restore(t *testing.T) {
 		}
 	}
 
-	gr, _ := cs2.GetKey(3, []byte("key"))
+	gr, _ := cs1.GetKey(3, []byte("key"))
 	for _, r := range gr {
 		if r.Err != nil {
 			t.Fatal(r.Err)
@@ -210,12 +199,17 @@ func Test_ChordStore_Snapshot_Restore(t *testing.T) {
 		}
 	}
 
+	// Add node
 	<-time.After(300 * time.Millisecond)
-	c1.Ring.Leave()
-	cs1.Shutdown()
+	c2, err := initConfig(65432, "127.0.0.1:22345")
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	c1.Listener.Close()
-	c1.Chord.Transport.Shutdown()
+	cs2, e2 := NewChordStore(c2, &MemKeyValueStore{})
+	if e2 != nil {
+		t.Fatal(e2)
+	}
 
 	// Wait for stabilize
 	<-time.After(1000 * time.Millisecond)

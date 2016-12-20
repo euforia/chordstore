@@ -32,7 +32,7 @@ func NewTransparentStore(vnstore VnodeStore, vnodes ...*chord.Vnode) (*Transpare
 func (ts *TransparentStore) init(vnstore VnodeStore, vnodes ...*chord.Vnode) (err error) {
 
 	for _, vn := range vnodes {
-		if ts.local[vn.StringID()], err = vnstore.New(); err != nil {
+		if ts.local[vn.StringID()], err = vnstore.New(vn); err != nil {
 			return
 		}
 	}
@@ -124,10 +124,16 @@ type MemKeyValueStore struct {
 	m map[string][]byte
 	// objects
 	o map[string][]byte
+	// vnode
+	vn *chord.Vnode
 }
 
-func (s *MemKeyValueStore) New() (VnodeStore, error) {
-	return &MemKeyValueStore{m: map[string][]byte{}, o: map[string][]byte{}}, nil
+func (s *MemKeyValueStore) New(vn *chord.Vnode) (VnodeStore, error) {
+	return &MemKeyValueStore{
+		m:  map[string][]byte{},
+		o:  map[string][]byte{},
+		vn: vn,
+	}, nil
 }
 
 func (s *MemKeyValueStore) GetObject(key []byte) (io.Reader, error) {
@@ -230,7 +236,7 @@ func (s *MemKeyValueStore) Snapshot(wr io.Writer) error {
 	zw := zlib.NewWriter(wr)
 	defer zw.Close()
 
-	log.Printf("DBG [Snapshot] keys=%d objects=%d", len(s.m), len(s.o))
+	log.Printf("DBG [Snapshot] vnode=%s keys=%d objects=%d", s.vn.StringID(), len(s.m), len(s.o))
 
 	/*for k, v := range s.o {
 		log.Printf("%s %d", k, len(v))
@@ -241,7 +247,8 @@ func (s *MemKeyValueStore) Snapshot(wr io.Writer) error {
 }
 
 // Restore dataset from reader de-compressing and de-serializing the data to the
-// datastructure
+// datastructure.  We may need to reset the current data before restoring ???.
+// Currently a merge is performed overwriting an existing key.
 func (s *MemKeyValueStore) Restore(r io.Reader) error {
 
 	rd, err := zlib.NewReader(r)
@@ -260,7 +267,7 @@ func (s *MemKeyValueStore) Restore(r io.Reader) error {
 		return err
 	}
 
-	log.Printf("DBG [Restore] Received keys=%d objects=%d", len(tk), len(to))
+	log.Printf("DBG [Restore] Received vnode=%s keys=%d objects=%d", s.vn.StringID(), len(tk), len(to))
 
 	for k, v := range tk {
 		// TODO if !bytes.Equal(s.m[k],v) { 'inconsistent data' }
