@@ -139,7 +139,7 @@ func (s *MemKeyValueStore) New(vn *chord.Vnode) (VnodeStore, error) {
 func (s *MemKeyValueStore) GetObject(key []byte) (io.Reader, error) {
 	v, ok := s.o[fmt.Sprintf("%x", key)]
 	if !ok {
-		return nil, fmt.Errorf("key not found: %x", key)
+		return nil, fmt.Errorf("objec not found: %x", key)
 	}
 
 	buf := new(bytes.Buffer)
@@ -171,7 +171,7 @@ func (s *MemKeyValueStore) RemoveObject(key []byte) error {
 		delete(s.o, k)
 		return nil
 	}
-	return fmt.Errorf("key not found: %x", key)
+	return fmt.Errorf("object not found: %x", key)
 }
 
 // GetKey from datastore
@@ -180,7 +180,7 @@ func (s *MemKeyValueStore) GetKey(key []byte) ([]byte, error) {
 		return val, nil
 	}
 
-	return nil, fmt.Errorf("not found: %s", key)
+	return nil, fmt.Errorf("key not found: %s", key)
 }
 
 // PutKey key-value

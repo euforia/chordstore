@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 
 	chord "github.com/euforia/go-chord"
 	context "golang.org/x/net/context"
@@ -74,25 +73,71 @@ func NewChordStore(cfg *Config, vnstore VnodeStore) (*ChordStore, error) {
 	return cs, nil
 }
 
-func (cs *ChordStore) GetObject(n int, key []byte) (io.Reader, error) {
+/*func (cs *ChordStore) GetObject(n int, key []byte) (io.Reader, error) {
 	vns, err := cs.ring.Lookup(n, key)
 	if err != nil {
 		return nil, err
 	}
 
-	for i, vn := range vns {
-		log.Printf("%d GET %s %x", i, shortID(vn), key)
+	for _, vn := range vns {
+		//log.Printf("GET try=%d vnode=%s key=%x", i+1, shortID(vn), key)
 		rd, e := cs.store.GetObject(vn, key)
 		if e == nil {
 			return rd, nil
 		}
-		log.Printf("%d GET ERR %s %x %v", i, shortID(vn), key, e)
+		//log.Printf("%d GET ERR %s %x %v", i, shortID(vn), key, e)
 		err = e
 	}
 	return nil, err
+}*/
+
+func (cs *ChordStore) GetObject(n int, key []byte) ([]*VnodeDataIO, error) {
+	vns, err := cs.ring.Lookup(n, key)
+	if err != nil {
+		return nil, err
+	}
+
+	vds := make([]*VnodeDataIO, len(vns))
+	for i, vn := range vns {
+		vds[i] = &VnodeDataIO{Vnode: vn}
+
+		buf := bytes.NewBuffer(nil)
+		//log.Printf("GET try=%d vnode=%s key=%x", i+1, shortID(vn), key)
+		rd, err := cs.store.GetObject(vn, key)
+		if err == nil {
+			if _, err = io.Copy(buf, rd); err == nil {
+				vds[i].r = buf
+				continue
+			}
+		}
+		vds[i].Err = err
+	}
+	return vds, nil
 }
 
 // PutObject from reader returning the sha256 hash as the key
+func (cs *ChordStore) PutObject(n int, key []byte, rd io.Reader) ([]*VnodeDataIO, error) {
+	vns, err := cs.ring.Lookup(n, key)
+	if err != nil {
+		return nil, err
+	}
+
+	// Copy initial data
+	buf := new(bytes.Buffer)
+	if _, err = io.Copy(buf, rd); err != nil {
+		return nil, err
+	}
+
+	vds := make([]*VnodeDataIO, len(vns))
+	for i, vn := range vns {
+		vds[i] = &VnodeDataIO{Vnode: vn}
+		vds[i].Err = cs.store.PutObject(vn, key, bytes.NewBuffer(buf.Bytes()))
+	}
+
+	return vds, nil
+}
+
+/*// PutObject from reader returning the sha256 hash as the key
 func (cs *ChordStore) PutObject(n int, key []byte, rd io.Reader) error {
 	buf := new(bytes.Buffer)
 	_, err := io.Copy(buf, rd)
@@ -111,9 +156,25 @@ func (cs *ChordStore) PutObject(n int, key []byte, rd io.Reader) error {
 	}
 
 	return err
+}*/
+
+// RemoveObject with n copies
+func (cs *ChordStore) RemoveObject(n int, key []byte) ([]*VnodeDataIO, error) {
+	vns, err := cs.ring.Lookup(n, key)
+	if err != nil {
+		return nil, err
+	}
+
+	vds := make([]*VnodeDataIO, len(vns))
+	for i, vn := range vns {
+		vds[i] = &VnodeDataIO{Vnode: vn}
+		vds[i].Err = cs.store.RemoveObject(vn, key)
+	}
+
+	return vds, nil
 }
 
-func (cs *ChordStore) RemoveObject(n int, key []byte) error {
+/*func (cs *ChordStore) RemoveObject(n int, key []byte) error {
 	vns, err := cs.ring.Lookup(n, key)
 	if err != nil {
 		return err
@@ -124,7 +185,7 @@ func (cs *ChordStore) RemoveObject(n int, key []byte) error {
 	}
 
 	return err
-}
+}*/
 
 // PutKey with value on the ring with a replica count of n
 func (cs *ChordStore) PutKey(n int, key, value []byte) ([]*VnodeData, error) {
@@ -410,4 +471,14 @@ func (vd *VnodeData) MarshalJSON() ([]byte, error) {
 		m["error"] = vd.Err.Error()
 	}
 	return json.Marshal(m)
+}
+
+type VnodeDataIO struct {
+	Vnode *chord.Vnode
+	Err   error
+	r     io.Reader
+}
+
+func (vd *VnodeDataIO) Reader() io.Reader {
+	return vd.r
 }

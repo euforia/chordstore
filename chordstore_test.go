@@ -1,8 +1,10 @@
 package chordstore
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"testing"
 	"time"
@@ -257,4 +259,74 @@ func Test_VnodeData_Marshal(t *testing.T) {
 	if string(v.Data) != "testdata" {
 		t.Fatal("wrong value")
 	}
+}
+
+func Test_ChordStore_Object(t *testing.T) {
+	c1, err := initConfig(34956)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cs1, e1 := NewChordStore(c1, &MemKeyValueStore{})
+	if e1 != nil {
+		t.Fatal(e1)
+	}
+
+	<-time.After(200 * time.Millisecond)
+	c2, err := initConfig(34957, "127.0.0.1:34956")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cs2, e2 := NewChordStore(c2, &MemKeyValueStore{})
+	if e2 != nil {
+		t.Fatal(e2)
+	}
+
+	<-time.After(200 * time.Millisecond)
+	cds, e := cs1.PutObject(3, []byte("key1"), bytes.NewBuffer([]byte("first payload")))
+	if e != nil {
+		t.Fatal(e)
+	}
+	for _, v := range cds {
+		if v.Err != nil {
+			t.Fatal(v.Err)
+		}
+	}
+
+	cds, e = cs2.GetObject(3, []byte("key1"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	for _, v := range cds {
+		if v.Err != nil {
+			t.Fatal(v.Err)
+		}
+		b, _ := ioutil.ReadAll(v.r)
+		if string(b) != "first payload" {
+			t.Fatal("payload mismatch")
+		}
+	}
+
+	cds, e = cs2.RemoveObject(3, []byte("key1"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	for _, v := range cds {
+		if v.Err != nil {
+			t.Log(v.Err)
+			t.Fail()
+		}
+	}
+
+	cds, e = cs2.GetObject(3, []byte("key1"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	for _, v := range cds {
+		if v.Err == nil {
+			t.Fatal("key should not exist")
+		}
+	}
+
 }
