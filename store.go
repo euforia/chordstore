@@ -230,11 +230,11 @@ func (s *MemKeyValueStore) Snapshot(wr io.Writer) error {
 	zw := zlib.NewWriter(wr)
 	defer zw.Close()
 
-	log.Printf("[Snapshot] keys=%d objects=%d", len(s.m), len(s.o))
+	log.Printf("DBG [Snapshot] keys=%d objects=%d", len(s.m), len(s.o))
 
-	for k, v := range s.o {
+	/*for k, v := range s.o {
 		log.Printf("%s %d", k, len(v))
-	}
+	}*/
 
 	menc := msgpack.NewEncoder(zw)
 	return menc.Encode(s.m, s.o)
@@ -260,12 +260,14 @@ func (s *MemKeyValueStore) Restore(r io.Reader) error {
 		return err
 	}
 
-	log.Printf("[Restore] Received keys=%d objects=%d", len(tk), len(to))
+	log.Printf("DBG [Restore] Received keys=%d objects=%d", len(tk), len(to))
 
 	for k, v := range tk {
+		// TODO if !bytes.Equal(s.m[k],v) { 'inconsistent data' }
 		s.m[k] = v
 	}
 	for k, v := range to {
+		// TODO if !bytes.Equal(s.o[k],v) { 'inconsistent data' }
 		s.o[k] = v
 	}
 

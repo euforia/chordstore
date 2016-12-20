@@ -179,7 +179,7 @@ func Test_ChordStore_Snapshot_Restore(t *testing.T) {
 	}
 
 	<-time.After(200 * time.Millisecond)
-	c2, err := initConfig(65432, "127.0.0.1:12345")
+	c2, err := initConfig(65432, "127.0.0.1:22345")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -273,6 +273,7 @@ func (cs *ChordStore) SnapshotRPC(vn *chord.Vnode, stream DHT_SnapshotRPCServer)
 
 // RestoreRPC server-side call
 func (cs *ChordStore) RestoreRPC(stream DHT_RestoreRPCServer) error {
+	// Receive header with vnode
 	var vn chord.Vnode
 	if err := stream.RecvMsg(&vn); err != nil {
 		return err
@@ -292,13 +293,6 @@ func (cs *ChordStore) RestoreRPC(stream DHT_RestoreRPCServer) error {
 		buf.Write(dc.Data)
 	}
 
-	/*ctx := stream.Context()
-	vn, ok := ctx.Value("vnode").(*chord.Vnode)
-	if !ok {
-		log.Println(ctx.Value("vnode"))
-		return stream.SendAndClose(&ErrResponse{Err: "vnode not provided"})
-	}*/
-
 	ersp := &ErrResponse{}
 	if err := cs.store.Restore(&vn, buf); err != nil {
 		ersp.Err = err.Error()
@@ -307,15 +301,12 @@ func (cs *ChordStore) RestoreRPC(stream DHT_RestoreRPCServer) error {
 	return stream.SendAndClose(ersp)
 }
 
+// PutObjectRPC server-side call
 func (cs *ChordStore) PutObjectRPC(stream DHT_PutObjectRPCServer) error {
-	ctx := stream.Context()
-	vn, ok := ctx.Value("vnode").(*chord.Vnode)
-	if !ok {
-		return stream.SendAndClose(&ErrResponse{Err: "vnode not provided"})
-	}
-	oid, ok := ctx.Value("oid").([]byte)
-	if !ok {
-		return stream.SendAndClose(&ErrResponse{Err: "oid not provided"})
+	// Receive header with vnode, and object id
+	var args DHTBytes
+	if err := stream.RecvMsg(&args); err != nil {
+		return stream.SendAndClose(&ErrResponse{Err: err.Error()})
 	}
 
 	buf := new(bytes.Buffer)
@@ -333,7 +324,7 @@ func (cs *ChordStore) PutObjectRPC(stream DHT_PutObjectRPCServer) error {
 	}
 
 	rsp := &ErrResponse{}
-	if err := cs.store.PutObject(vn, oid, buf); err != nil {
+	if err := cs.store.PutObject(args.Vn, args.B, buf); err != nil {
 		rsp.Err = err.Error()
 	}
 

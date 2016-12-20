@@ -155,13 +155,18 @@ func (st *ChordStoreTransport) PutObject(vn *chord.Vnode, key []byte, rd io.Read
 	}
 	defer st.returnClient(out)
 
-	ctx := context.WithValue(context.Background(), "oid", key)
-	ctx = context.WithValue(ctx, "vnode", vn)
-	cli, err := out.c.PutObjectRPC(ctx)
+	cli, err := out.c.PutObjectRPC(context.Background())
 	if err != nil {
 		return err
 	}
 
+	// Send header with vnode and objec id
+	mt := &DHTBytes{Vn: vn, B: key}
+	if err = cli.SendMsg(mt); err != nil {
+		return err
+	}
+
+	// Send object data
 	buf := make([]byte, 65519)
 	for {
 		n, err := rd.Read(buf)
@@ -169,12 +174,13 @@ func (st *ChordStoreTransport) PutObject(vn *chord.Vnode, key []byte, rd io.Read
 			if err == io.EOF {
 				break
 			}
+			return err
 		}
-		if err == io.EOF {
+		/*if err == io.EOF {
 			break
 		} else if err != nil {
 			return err
-		}
+		}*/
 
 		ds := &DataStream{Data: buf[:n]}
 		if err = cli.Send(ds); err != nil {
