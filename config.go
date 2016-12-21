@@ -47,8 +47,10 @@ func (cfg *Config) ChordDelegate() *ChordDelegate {
 	return d
 }
 
-// DefaultConfig returns a semi-sane default configuration
-func DefaultConfig(bindAddr string) *Config {
+// DefaultConfig returns a semi-sane default configuration.  If advAddr is empty
+// it will attempt to detect the advAddr.
+func DefaultConfig(bindAddr, advAddr string) (*Config, error) {
+
 	c := &Config{
 		Chord: &ChordConfig{
 			BindAddr:    bindAddr,
@@ -60,12 +62,17 @@ func DefaultConfig(bindAddr string) *Config {
 		Replicas: 3,
 	}
 
-	c.Chord.Config = chord.DefaultConfig(c.Chord.BindAddr)
+	addr, err := getAdvertiseAddr(bindAddr, advAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	c.Chord.Config = chord.DefaultConfig(addr)
 	c.Chord.StabilizeMin = time.Duration(5 * time.Second)
 	c.Chord.StabilizeMax = time.Duration(15 * time.Second)
 	c.Chord.Delegate = &ChordDelegate{}
 	//c.Chord.HashFunc = sha256.New
-	return c
+	return c, nil
 }
 
 // initChordRing initializes the ring with the given config and assigns the

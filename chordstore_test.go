@@ -28,13 +28,15 @@ var (
 func initConfig(p int, j ...string) (*Config, error) {
 	laddr := fmt.Sprintf("127.0.0.1:%d", p)
 
-	c1 := DefaultConfig(laddr)
+	c1, err := DefaultConfig(laddr, "")
+	if err != nil {
+		return nil, err
+	}
 
 	c1.Chord.StabilizeMin = 15 * time.Millisecond
 	c1.Chord.StabilizeMax = 45 * time.Millisecond
 	c1.Chord.Peers = j
 
-	var err error
 	c1.Listener, err = net.Listen("tcp", laddr)
 	return c1, err
 }
