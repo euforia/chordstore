@@ -29,7 +29,7 @@ func NewAdminServer(cfg *Config, store *ChordStore) *AdminServer {
 func (svr *AdminServer) Start(addr string) error {
 	err := http.ListenAndServe(addr, svr)
 	if err != nil {
-		log.Println("Failed to start Admin Server:", err)
+		log.Println("[admin] Failed to start Admin Server:", err)
 	}
 	return err
 }
