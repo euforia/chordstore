@@ -4,8 +4,6 @@ import (
 	"flag"
 	"log"
 	"net"
-	"net/http"
-	"strings"
 
 	"github.com/euforia/chordstore"
 )
@@ -16,23 +14,15 @@ var (
 	joinAddrs = flag.String("j", "", "Initial cluster membders to join")
 )
 
-func parseJoinAddrs() []string {
-	out := []string{}
-	for _, v := range strings.Split(*joinAddrs, ",") {
-		if c := strings.TrimSpace(v); c != "" {
-			out = append(out, c)
-		}
-	}
-	return out
-}
-
 func init() {
 	flag.Parse()
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
 func main() {
+
 	cfg := chordstore.DefaultConfig(*bindAddr)
-	cfg.Chord.Peers = parseJoinAddrs()
+	cfg.Chord.Peers = chordstore.ParsePeersList(*joinAddrs)
 
 	var (
 		chordStore *chordstore.ChordStore
@@ -48,12 +38,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	he := chordstore.NewHealingEngine(chordStore)
-	go he.Start()
+	/*he := chordstore.NewHealingEngine(chordStore)
+	go he.Start()*/
 
-	httpServer := &Server{store: chordStore, cfg: cfg}
-	if err = http.ListenAndServe(*httpAddr, httpServer); err != nil {
-		log.Fatal(err)
-	}
+	admServer := chordstore.NewAdminServer(cfg, chordStore)
+	admServer.Start(*httpAddr)
+	select {}
 
 }

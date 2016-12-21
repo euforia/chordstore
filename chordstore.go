@@ -261,8 +261,8 @@ func (cs *ChordStore) RemoveKey(n int, key []byte) ([]*VnodeData, error) {
 }
 
 // PutKeyRPC server-side
-func (cs *ChordStore) PutKeyRPC(ctx context.Context, dkv *DHTKeyValue) (*ErrResponse, error) {
-	resp := &ErrResponse{}
+func (cs *ChordStore) PutKeyRPC(ctx context.Context, dkv *DHTKeyValue) (*chord.ErrResponse, error) {
+	resp := &chord.ErrResponse{}
 	if err := cs.store.PutKey(dkv.Vn, dkv.Key, dkv.Value); err != nil {
 		resp.Err = err.Error()
 	}
@@ -270,8 +270,8 @@ func (cs *ChordStore) PutKeyRPC(ctx context.Context, dkv *DHTKeyValue) (*ErrResp
 }
 
 // UpdateKeyRPC server-side
-func (cs *ChordStore) UpdateKeyRPC(ctx context.Context, dkv *DHTHashKeyValue) (*ErrResponse, error) {
-	resp := &ErrResponse{}
+func (cs *ChordStore) UpdateKeyRPC(ctx context.Context, dkv *DHTHashKeyValue) (*chord.ErrResponse, error) {
+	resp := &chord.ErrResponse{}
 	if err := cs.store.UpdateKey(dkv.Vn, dkv.PrevHash, dkv.Key, dkv.Value); err != nil {
 		resp.Err = err.Error()
 	}
@@ -291,8 +291,8 @@ func (cs *ChordStore) GetKeyRPC(ctx context.Context, key *DHTBytes) (*DHTBytesEr
 }
 
 // RemoveKeyRPC server-side
-func (cs *ChordStore) RemoveKeyRPC(ctx context.Context, key *DHTBytes) (*ErrResponse, error) {
-	resp := &ErrResponse{}
+func (cs *ChordStore) RemoveKeyRPC(ctx context.Context, key *DHTBytes) (*chord.ErrResponse, error) {
+	resp := &chord.ErrResponse{}
 	if err := cs.store.RemoveKey(key.Vn, key.B); err != nil {
 		resp.Err = err.Error()
 	}
@@ -348,13 +348,13 @@ func (cs *ChordStore) RestoreRPC(stream DHT_RestoreRPCServer) error {
 			if err == io.EOF {
 				break
 			}
-			return stream.SendAndClose(&ErrResponse{Err: err.Error()})
+			return stream.SendAndClose(&chord.ErrResponse{Err: err.Error()})
 		}
 
 		buf.Write(dc.Data)
 	}
 
-	ersp := &ErrResponse{}
+	ersp := &chord.ErrResponse{}
 	if err := cs.store.Restore(&vn, buf); err != nil {
 		ersp.Err = err.Error()
 	}
@@ -367,7 +367,7 @@ func (cs *ChordStore) PutObjectRPC(stream DHT_PutObjectRPCServer) error {
 	// Receive header with vnode, and object id
 	var args DHTBytes
 	if err := stream.RecvMsg(&args); err != nil {
-		return stream.SendAndClose(&ErrResponse{Err: err.Error()})
+		return stream.SendAndClose(&chord.ErrResponse{Err: err.Error()})
 	}
 
 	buf := new(bytes.Buffer)
@@ -378,13 +378,13 @@ func (cs *ChordStore) PutObjectRPC(stream DHT_PutObjectRPCServer) error {
 			if err == io.EOF {
 				break
 			}
-			return stream.SendAndClose(&ErrResponse{Err: err.Error()})
+			return stream.SendAndClose(&chord.ErrResponse{Err: err.Error()})
 		}
 
 		buf.Write(dc.Data)
 	}
 
-	rsp := &ErrResponse{}
+	rsp := &chord.ErrResponse{}
 	if err := cs.store.PutObject(args.Vn, args.B, buf); err != nil {
 		rsp.Err = err.Error()
 	}
@@ -424,13 +424,13 @@ func (cs *ChordStore) GetObjectRPC(key *DHTBytes, stream DHT_GetObjectRPCServer)
 	return nil
 }
 
-func (cs *ChordStore) RemoveObjectRPC(ctx context.Context, key *DHTBytes) (*ErrResponse, error) {
+func (cs *ChordStore) RemoveObjectRPC(ctx context.Context, key *DHTBytes) (*chord.ErrResponse, error) {
 	var (
 		vn     = key.Vn
 		objkey = key.B
 	)
 
-	rsp := &ErrResponse{}
+	rsp := &chord.ErrResponse{}
 	if err := cs.store.RemoveObject(vn, objkey); err != nil {
 		rsp.Err = err.Error()
 	}

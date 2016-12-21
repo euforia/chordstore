@@ -1,6 +1,9 @@
 package chordstore
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 func mergeErrors(err1, err2 error) error {
 	if err1 == nil {
@@ -10,4 +13,15 @@ func mergeErrors(err1, err2 error) error {
 	} else {
 		return fmt.Errorf("%s\n%s", err1, err2)
 	}
+}
+
+// ParsePeersList parses a comma separate list of peers
+func ParsePeersList(peerList string) []string {
+	out := []string{}
+	for _, v := range strings.Split(peerList, ",") {
+		if c := strings.TrimSpace(v); c != "" {
+			out = append(out, c)
+		}
+	}
+	return out
 }

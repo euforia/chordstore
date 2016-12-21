@@ -1,8 +1,8 @@
 hash: cbabc7f9897b8ea67863924e14c6b9eef32025186116c0e9808916736b8547a7
-updated: 2016-11-22T22:19:16.273971674-08:00
+updated: 2016-12-20T17:34:11.131847025-08:00
 imports:
 - name: github.com/euforia/go-chord
-  version: 4fa7f4812317e73bbd8622abcb2c039234c86ebe
+  version: 7004178c8c7abc799f886ca9cceff9304b56723a
 - name: github.com/golang/protobuf
   version: df1d3ca07d2d07bba352d5b73c4313b4e2a6203e
   subpackages:
@@ -15,6 +15,17 @@ imports:
   - http2/hpack
   - internal/timeseries
   - trace
+- name: google.golang.org/appengine
+  version: 08a149cfaee099e6ce4be01c0113a78c85ee1dee
+  subpackages:
+  - datastore
+  - internal
+  - internal/app_identity
+  - internal/base
+  - internal/datastore
+  - internal/log
+  - internal/modules
+  - internal/remote_api
 - name: google.golang.org/grpc
   version: eddbd11c7ecd001d06777cb87b5ea7af54227907
   subpackages:
@@ -27,4 +38,8 @@ imports:
   - peer
   - tap
   - transport
+- name: gopkg.in/vmihailenco/msgpack.v2
+  version: 94af6ea04d2da6a09d6914ca79b8fb94f3acbba4
+  subpackages:
+  - codes
 testImports: []

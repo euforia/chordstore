@@ -30,13 +30,13 @@ type ChordConfig struct {
 type Config struct {
 	// Underlying chord config
 	Chord *ChordConfig
+	// Key and object replication count.
+	Replicas int
 	// GRPC server. This is so multiple services can be registered with grpc
 	Server *grpc.Server `json:"-"`
 	// This can be provided or a tcp listener is created using the bind address.
 	// It needs to be closed on shutdown
 	Listener net.Listener `json:"-"`
-	// Key replication count.
-	Replicas int
 	// Actual chord ring
 	Ring *chord.Ring `json:"-"`
 }

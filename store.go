@@ -147,6 +147,7 @@ func (s *MemKeyValueStore) GetObject(key []byte) (io.Reader, error) {
 	return buf, err
 }
 
+// PutObject with the given key with the data from the reader
 func (s *MemKeyValueStore) PutObject(key []byte, rd io.Reader) error {
 	buf := new(bytes.Buffer)
 	_, err := io.Copy(buf, rd)
@@ -161,6 +162,7 @@ func (s *MemKeyValueStore) PutObject(key []byte, rd io.Reader) error {
 	return nil
 }
 
+// RemoveObject with the given key
 func (s *MemKeyValueStore) RemoveObject(key []byte) error {
 	k := fmt.Sprintf("%x", key)
 
@@ -236,11 +238,7 @@ func (s *MemKeyValueStore) Snapshot(wr io.Writer) error {
 	zw := zlib.NewWriter(wr)
 	defer zw.Close()
 
-	log.Printf("DBG [Snapshot] vnode=%s keys=%d objects=%d", s.vn.StringID(), len(s.m), len(s.o))
-
-	/*for k, v := range s.o {
-		log.Printf("%s %d", k, len(v))
-	}*/
+	log.Printf("DBG [snapshot] vnode=%s keys=%d objects=%d", s.vn.StringID(), len(s.m), len(s.o))
 
 	menc := msgpack.NewEncoder(zw)
 	return menc.Encode(s.m, s.o)
@@ -267,7 +265,7 @@ func (s *MemKeyValueStore) Restore(r io.Reader) error {
 		return err
 	}
 
-	log.Printf("DBG [Restore] Received vnode=%s keys=%d objects=%d", s.vn.StringID(), len(tk), len(to))
+	log.Printf("DBG [restore] Received vnode=%s keys=%d objects=%d", s.vn.StringID(), len(tk), len(to))
 
 	for k, v := range tk {
 		// TODO if !bytes.Equal(s.m[k],v) { 'inconsistent data' }

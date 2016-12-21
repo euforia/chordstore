@@ -201,6 +201,8 @@ func Test_ChordStore_Snapshot_Restore(t *testing.T) {
 		}
 	}
 
+	cs1.PutObject(3, []byte("object"), bytes.NewBuffer([]byte("some test data")))
+
 	// Add node
 	<-time.After(300 * time.Millisecond)
 	c2, err := initConfig(65432, "127.0.0.1:22345")

@@ -205,7 +205,7 @@ func (st *ChordStoreTransport) PutKey(vn *chord.Vnode, key, value []byte) error 
 	if err == nil {
 		defer st.returnClient(out)
 
-		var resp *ErrResponse
+		var resp *chord.ErrResponse
 		if resp, err = out.c.PutKeyRPC(context.Background(), &DHTKeyValue{Vn: vn, Key: key, Value: value}); err == nil {
 			if resp.Err == "" {
 				return nil
@@ -223,7 +223,7 @@ func (st *ChordStoreTransport) UpdateKey(vn *chord.Vnode, prevHash, key, value [
 	if err == nil {
 		defer st.returnClient(out)
 
-		var resp *ErrResponse
+		var resp *chord.ErrResponse
 		if resp, err = out.c.UpdateKeyRPC(context.Background(),
 			&DHTHashKeyValue{Vn: vn, PrevHash: prevHash, Key: key, Value: value}); err == nil {
 
@@ -241,7 +241,7 @@ func (st *ChordStoreTransport) RemoveKey(vn *chord.Vnode, key []byte) error {
 	out, err := st.getClient(vn.Host)
 	if err == nil {
 		defer st.returnClient(out)
-		var resp *ErrResponse
+		var resp *chord.ErrResponse
 		if resp, err = out.c.RemoveKeyRPC(context.Background(), &DHTBytes{B: key, Vn: vn}); err == nil {
 			if resp.Err == "" {
 				return nil
@@ -257,7 +257,7 @@ func (st *ChordStoreTransport) RemoveObject(vn *chord.Vnode, key []byte) error {
 	out, err := st.getClient(vn.Host)
 	if err == nil {
 		defer st.returnClient(out)
-		var resp *ErrResponse
+		var resp *chord.ErrResponse
 		if resp, err = out.c.RemoveObjectRPC(context.Background(), &DHTBytes{B: key, Vn: vn}); err == nil {
 			if resp.Err == "" {
 				return nil
