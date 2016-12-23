@@ -80,10 +80,10 @@ func IsAdvertisableAddress(hp string) (bool, error) {
 		return false, nil
 	}
 
-	ip := net.ParseIP(pp[0])
-	if ip.To4() == nil {
-		return false, nil
+	if _, err := net.ResolveIPAddr("ip4", pp[0]); err != nil {
+		return false, err
 	}
+
 	return true, nil
 }
 
