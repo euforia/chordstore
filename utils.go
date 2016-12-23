@@ -27,8 +27,8 @@ func ParsePeersList(peerList string) []string {
 	return out
 }
 
-// Traverse interfaces eliminating, localhost, ifaces with no addresses and ipv6
-// addresses.  It returns a list by priority
+// AutoDetectIPAddress traverses interfaces eliminating, localhost, ifaces with
+// no addresses and ipv6 addresses.  It returns a list by priority
 func AutoDetectIPAddress() ([]string, error) {
 
 	ifaces, err := net.Interfaces()
@@ -87,6 +87,10 @@ func IsAdvertisableAddress(hp string) (bool, error) {
 	return true, nil
 }
 
+// getAdvertiseAddr returns the advertise address including the port based on the
+// bind and advertise addresses passed in. If an adv. address is not provided, it
+// tries use use the bind address if it is an actual ip or uses the first available
+// and usable ip.
 func getAdvertiseAddr(bindAddr, advAddr string) (string, error) {
 	if advAddr == "" {
 		if k, _ := IsAdvertisableAddress(bindAddr); k {

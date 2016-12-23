@@ -139,7 +139,7 @@ func (s *MemKeyValueStore) New(vn *chord.Vnode) (VnodeStore, error) {
 func (s *MemKeyValueStore) GetObject(key []byte) (io.Reader, error) {
 	v, ok := s.o[fmt.Sprintf("%x", key)]
 	if !ok {
-		return nil, fmt.Errorf("objec not found: %x", key)
+		return nil, fmt.Errorf("object not found: %x", key)
 	}
 
 	buf := new(bytes.Buffer)

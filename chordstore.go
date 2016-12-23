@@ -73,24 +73,6 @@ func NewChordStore(cfg *Config, vnstore VnodeStore) (*ChordStore, error) {
 	return cs, nil
 }
 
-/*func (cs *ChordStore) GetObject(n int, key []byte) (io.Reader, error) {
-	vns, err := cs.ring.Lookup(n, key)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, vn := range vns {
-		//log.Printf("GET try=%d vnode=%s key=%x", i+1, shortID(vn), key)
-		rd, e := cs.store.GetObject(vn, key)
-		if e == nil {
-			return rd, nil
-		}
-		//log.Printf("%d GET ERR %s %x %v", i, shortID(vn), key, e)
-		err = e
-	}
-	return nil, err
-}*/
-
 func (cs *ChordStore) GetObject(n int, key []byte) ([]*VnodeDataIO, error) {
 	vns, err := cs.ring.Lookup(n, key)
 	if err != nil {
@@ -111,6 +93,8 @@ func (cs *ChordStore) GetObject(n int, key []byte) ([]*VnodeDataIO, error) {
 			}
 		}
 		vds[i].Err = err
+		// TODO:
+		//cs.healQ <- HealRequest{Vnode: vn, Key: key}
 	}
 	return vds, nil
 }
@@ -137,27 +121,6 @@ func (cs *ChordStore) PutObject(n int, key []byte, rd io.Reader) ([]*VnodeDataIO
 	return vds, nil
 }
 
-/*// PutObject from reader returning the sha256 hash as the key
-func (cs *ChordStore) PutObject(n int, key []byte, rd io.Reader) error {
-	buf := new(bytes.Buffer)
-	_, err := io.Copy(buf, rd)
-	if err != nil {
-		return err
-	}
-
-	vns, err := cs.ring.Lookup(n, key)
-	if err != nil {
-		return err
-	}
-
-	for _, vn := range vns {
-		e := cs.store.PutObject(vn, key, bytes.NewBuffer(buf.Bytes()))
-		err = mergeErrors(err, e)
-	}
-
-	return err
-}*/
-
 // RemoveObject with n copies
 func (cs *ChordStore) RemoveObject(n int, key []byte) ([]*VnodeDataIO, error) {
 	vns, err := cs.ring.Lookup(n, key)
@@ -173,19 +136,6 @@ func (cs *ChordStore) RemoveObject(n int, key []byte) ([]*VnodeDataIO, error) {
 
 	return vds, nil
 }
-
-/*func (cs *ChordStore) RemoveObject(n int, key []byte) error {
-	vns, err := cs.ring.Lookup(n, key)
-	if err != nil {
-		return err
-	}
-
-	for _, vn := range vns {
-		err = mergeErrors(err, cs.store.RemoveObject(vn, key))
-	}
-
-	return err
-}*/
 
 // PutKey with value on the ring with a replica count of n
 func (cs *ChordStore) PutKey(n int, key, value []byte) ([]*VnodeData, error) {
@@ -237,7 +187,10 @@ func (cs *ChordStore) GetKey(n int, key []byte) ([]*VnodeData, error) {
 		out := make([]*VnodeData, len(vns))
 		for i, vn := range vns {
 			o := &VnodeData{Vnode: vn}
-			o.Data, o.Err = cs.store.GetKey(vn, key)
+			if o.Data, o.Err = cs.store.GetKey(vn, key); o.Err != nil {
+				// TODO:
+				//cs.healQ <- HealRequest{Vnode: vn, Key: key}
+			}
 			out[i] = o
 		}
 		return out, nil

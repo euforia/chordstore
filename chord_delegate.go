@@ -39,7 +39,7 @@ func (cd *ChordDelegate) NewPredecessor(local, remoteNew, remotePrev *chord.Vnod
 	log.Printf("DBG [chord] NewPredecessor local=%s remote=%s old=%s", shortID(local), shortID(remoteNew), shortID(remotePrev))
 	// Ship a copy of the local vnode to the remote
 	if err := cd.transferVnodeData(local, remoteNew); err != nil {
-		log.Println("ERR [transfer]", local, remoteNew, err)
+		log.Printf("ERR [transfer] %s %s %v", local.StringID(), remoteNew.StringID(), err)
 	}
 
 }
@@ -47,6 +47,9 @@ func (cd *ChordDelegate) NewPredecessor(local, remoteNew, remotePrev *chord.Vnod
 // Leaving is called when local node is leaving the ring
 func (cd *ChordDelegate) Leaving(local, pred, succ *chord.Vnode) {
 	log.Printf("DBG [chord] Leaving local=%s succ=%s", shortID(local), shortID(succ))
+	if err := cd.transferVnodeData(local, succ); err != nil {
+		log.Printf("ERR [transfer] %s %s %v", local.StringID(), succ.StringID(), err)
+	}
 }
 
 // PredecessorLeaving is called when a predecessor leaves
