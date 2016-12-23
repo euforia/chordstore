@@ -2,7 +2,6 @@ package chordstore
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"io/ioutil"
 	"log"
@@ -11,11 +10,13 @@ import (
 	"strings"
 )
 
+// AdminServer allows to query key-values, objects and lookup key locations
 type AdminServer struct {
 	store *ChordStore
 	cfg   *Config
 }
 
+// NewAdminServer instantiates a new admin server.
 func NewAdminServer(cfg *Config, store *ChordStore) *AdminServer {
 	return &AdminServer{
 		store: store,
@@ -174,14 +175,7 @@ func (svr *AdminServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		oid, err := hex.DecodeString(s)
-		if err != nil {
-			w.WriteHeader(400)
-			w.Write([]byte(err.Error()))
-			return
-		}
-
-		svr.handleObject(w, r.WithContext(context.WithValue(ctx, "oid", oid)))
+		svr.handleObject(w, r.WithContext(context.WithValue(ctx, "oid", []byte(s))))
 
 	case strings.HasPrefix(r.URL.Path, "/kv"):
 		key := strings.TrimPrefix(r.URL.Path, "/kv/")
