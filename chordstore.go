@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 
 	chord "github.com/euforia/go-chord"
 	context "golang.org/x/net/context"
@@ -93,7 +94,7 @@ func (cs *ChordStore) GetObject(n int, key []byte) ([]*VnodeDataIO, error) {
 			}
 		}
 		vds[i].Err = err
-		// TODO:
+		log.Printf("TODO [consistency] Check: key=%x index=%d msg='%s'", key, i, err.Error())
 		//cs.healQ <- HealRequest{Vnode: vn, Key: key}
 	}
 	return vds, nil
@@ -164,9 +165,10 @@ func (cs *ChordStore) UpdateKey(n int, key, value []byte) ([]*VnodeData, error) 
 	for i := 1; i < len(rsp); i++ {
 		h := rsp[i].Hash()
 		if !bytes.Equal(hash[:], h[:]) {
-			// TODO:
+
+			log.Printf("TODO [consistency] Check: key=%s index=%d msg='inconsistent hash %x!=%x'", key, i, hash, h)
 			//cs.healQ <- HealRequest{Vnode: rsp[i].Vnode, Key: key}
-			return nil, fmt.Errorf("inconsistent key %x %x", hash, h)
+			return nil, fmt.Errorf("inconsistent hash %x!=%x", hash, h)
 		}
 	}
 
@@ -188,6 +190,7 @@ func (cs *ChordStore) GetKey(n int, key []byte) ([]*VnodeData, error) {
 		for i, vn := range vns {
 			o := &VnodeData{Vnode: vn}
 			if o.Data, o.Err = cs.store.GetKey(vn, key); o.Err != nil {
+				log.Printf("TODO [consistency] Check: key=%s index=%d msg='%s'", key, i, o.Err.Error())
 				// TODO:
 				//cs.healQ <- HealRequest{Vnode: vn, Key: key}
 			}
