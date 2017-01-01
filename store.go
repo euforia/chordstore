@@ -128,6 +128,7 @@ type MemKeyValueStore struct {
 	vn *chord.Vnode
 }
 
+// New instantiates a new store
 func (s *MemKeyValueStore) New(vn *chord.Vnode) (VnodeStore, error) {
 	return &MemKeyValueStore{
 		m:  map[string][]byte{},

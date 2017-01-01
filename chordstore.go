@@ -58,7 +58,7 @@ func NewChordStore(cfg *Config, vnstore VnodeStore) (*ChordStore, error) {
 		return nil, err
 	}
 
-	vnodes, err := cfg.Ring.ListVnodes(cfg.Ring.Hostname())
+	vnodes, err := cfg.Ring.ListVnodes(cfg.Chord.Hostname)
 	if err != nil {
 		return nil, err
 	}
